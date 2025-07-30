@@ -1,0 +1,75 @@
+name: UI + Load Test CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Chrome & ChromeDriver
+        run: |
+          sudo apt-get update && sudo apt-get install -y wget unzip
+          wget -q -O chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo dpkg -i chrome.deb || sudo apt-get -f install -y
+          CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+')
+          CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION}")
+          wget -q -O chromedriver.zip "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip"
+          unzip chromedriver.zip
+          chmod +x chromedriver
+          sudo mv chromedriver /usr/local/bin/
+
+      - name: Execute Selenium tests with report
+        run: |
+          mkdir -p selenium-report
+          pytest tests/selenium/ --html=selenium-report/report.html --self-contained-html
+
+      - name: Upload Selenium report
+        uses: actions/upload-artifact@v3
+        with:
+          name: selenium-report
+          path: selenium-report/
+
+      - name: Upload screenshots if test failed
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: selenium-screenshots
+          path: screenshots/
+
+      - name: Setup Java for JMeter
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+
+      - name: Install JMeter
+        run: |
+          wget https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-5.5.tgz
+          tar -xzf apache-jmeter-5.5.tgz
+          mv apache-jmeter-5.5 jmeter
+
+      - name: Run JMeter & generate HTML dashboard
+        run: |
+          ./jmeter/bin/jmeter -n -t tests/jmeter/test_plan.jmx -l result.jtl -e -o jmeter-report
+
+      - name: Upload JMeter HTML report
+        uses: actions/upload-artifact@v3
+        with:
+          name: jmeter-report
+          path: jmeter-report/

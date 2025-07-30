@@ -1,0 +1,84 @@
+name: Run JMeter Tests
+ 
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Select environment to run tests'
+        required: true
+        default: 'SIT'
+        type: choice
+        options:
+          - SIT
+          - UAT
+ 
+jobs:
+  jmeter-test:
+    runs-on: ubuntu-latest
+ 
+    steps:
+      # Step 1: Check out the repository
+      - name: Checkout repository
+        uses: actions/checkout@v2
+ 
+      # Step 2: Set up Java with the correct distribution
+      - name: Set up JDK 11
+        uses: actions/setup-java@v2
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+ 
+      # Step 3: Install JMeter
+      - name: Install JMeter
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget
+          wget https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-5.4.1.tgz
+          tar -xzf apache-jmeter-5.4.1.tgz
+          sudo ln -s $(pwd)/apache-jmeter-5.4.1/bin/jmeter /usr/local/bin/jmeter
+ 
+      # Step 4: Set environment-specific URL based on workflow dispatch input
+      - name: Set Environment URL
+        run: |
+          if [ "${{ github.event.inputs.environment }}" == "SIT" ]; then
+            echo "URL=restful-booker.herokuapp.com" >> $GITHUB_ENV
+          elif [ "${{ github.event.inputs.environment }}" == "UAT" ]; then
+            echo "URL=UAT_restful-booker.herokuapp.com" >> $GITHUB_ENV
+          fi
+ 
+      # Step 5: Run JMeter Tests
+      - name: Run JMeter Test
+        run: |
+          # Create output directory for JMeter reports
+          mkdir -p output
+          # Run JMeter test using environment-specific URL
+          jmeter -n -t APITest.jmx -Jurl=${{ env.URL }} -l results.jtl -e -o output
+        continue-on-error: true
+ 
+      # Step 6: Print Directory Contents for Debugging
+      - name: Print JMeter Directory Contents
+        run: |
+          ls -R apache-jmeter-5.4.1
+ 
+      # Step 7: Print JMeter logs for debugging (if they exist)
+      - name: Print JMeter Logs
+        run: |
+          if [ -f apache-jmeter-5.4.1/bin/jmeter.log ]; then
+            cat apache-jmeter-5.4.1/bin/jmeter.log
+          else
+            echo "JMeter log file not found."
+          fi
+ 
+      # Step 8: Upload the JMeter Test Results (results.jtl) as an artifact
+      - name: Upload JMeter Test Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: jmeter-results
+          path: results.jtl
+ 
+      # Step 9: Upload the JMeter HTML Report as an artifact
+      - name: Upload JMeter HTML Report
+        uses: actions/upload-artifact@v3
+        with:
+          name: jmeter-html-report
+          path: output
