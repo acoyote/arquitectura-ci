@@ -12,7 +12,7 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -40,14 +40,14 @@ jobs:
           pytest tests/selenium/ --html=selenium-report/report.html --self-contained-html
 
       - name: Upload Selenium report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: selenium-report
           path: selenium-report/
 
       - name: Upload screenshots if test failed
         if: failure()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: selenium-screenshots
           path: screenshots/
@@ -69,7 +69,7 @@ jobs:
           ./jmeter/bin/jmeter -n -t tests/jmeter/test_plan.jmx -l result.jtl -e -o jmeter-report
 
       - name: Upload JMeter HTML report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: jmeter-report
           path: jmeter-report/
